@@ -1,0 +1,24 @@
+[package]
+name = "rust-rest-api"
+version = "0.1.0"
+edition = "2018"
+
+[lib]
+name = "rest_api"
+path = "src/lib/lib.rs"
+
+[dependencies]
+sqlite3 = "*"
+hyper = {version = "*", features = ["full"]}
+clap = { version = "4.0.22", features = ["cargo"], optional = true }
+env_logger = "0.9.3"
+log = "0.4.17"
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+
+[features]
+build-binary = ["clap"]
+
+[[bin]]
+name = "rust_rest_api"
+path = "src/bin.rs"
+required-features = ["build-binary"]
