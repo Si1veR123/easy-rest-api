@@ -8,7 +8,7 @@ use lib::api_http_server::routing::BasicRoute;
 use rest_api as lib;
 use lib::enable_logging;
 use lib::config_parser::read_config;
-use lib::database::interfaces::{SQLLite3Interface, DatabaseInterface};
+use lib::database::interfaces::{SQLite3Interface, DatabaseInterface};
 use lib::app::App;
 use lib::routes;
 use lib::api_http_server::routing::Route;
@@ -37,11 +37,11 @@ async fn main() {
     enable_logging(&config);
 
     if cli_matches.get_flag("resetdb") {
-        SQLLite3Interface::delete_db(&config)
+        SQLite3Interface::delete_db(&config)
     }
 
-    let interface = SQLLite3Interface::connect(&config);
-    
+    let interface = SQLite3Interface::connect(&config);
+
     let routes = routes!(
         ("/people", "people sql table"),
         ("/jobs", "jobs sql table")

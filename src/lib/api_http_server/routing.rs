@@ -6,7 +6,6 @@ macro_rules! routes {
         vec
     }};
 }
-pub use routes;
 
 pub trait Route {
     // returns matching table name for route

@@ -7,7 +7,7 @@ pub enum DataType {
 }
 
 pub trait SerialiseField {
-    fn serialise(&self) -> DataType;
+    fn serialise(&self) -> String;
 }
 
 pub trait DeserialiseField {
@@ -19,8 +19,13 @@ pub struct DefaultTypeField {
 }
 
 impl SerialiseField for DefaultTypeField {
-    fn serialise(&self) -> DataType {
-        self.value.clone()
+    fn serialise(&self) -> String {
+        match &self.value {
+            DataType::Null => "null".to_string(),
+            DataType::Integer(i) => i.to_string(),
+            DataType::Real(r) => r.to_string(),
+            DataType::Text(t) => t.clone(),
+        }
     }
 }
 

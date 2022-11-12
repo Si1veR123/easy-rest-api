@@ -15,24 +15,27 @@ pub trait DatabaseInterface {
     fn table_from_types(&self, table_name: String, types: Vec<(String, DataType)>);
     fn delete_db(config: &Config)
         where Self: Sized;
-    fn execute_query(&self, query: String);
+    fn execute_raw_query(&self, query: String);
+
+    
 }
 
-pub struct SQLLite3Interface {
+pub struct SQLite3Interface {
     connection: Connection,
 }
 
-impl DatabaseInterface for SQLLite3Interface {
+impl DatabaseInterface for SQLite3Interface {
     fn connect(config: &Config) -> Self {
         let db_path = config.get("database_path").expect("Can't find 'database_path' config");
         let connection = open(db_path).expect(&format!("Can't open sqllite3 database at {}", db_path));
         
+        log::info!("Connected to database at {}", db_path);
         Self {
             connection
         }
     }
     fn table_from_types(&self, table_name: String, types: Vec<(String, DataType)>) {
-        let mut sql = format!("CREATE TABLE IF NOT EXISITS {} (", table_name);
+        let mut sql = format!("CREATE TABLE IF NOT EXISTS {} (", table_name);
 
         for (col_name, data_type) in types {
             sql.push_str(&col_name);
@@ -49,7 +52,9 @@ impl DatabaseInterface for SQLLite3Interface {
         sql.remove(sql.len()-1);
         sql.remove(sql.len()-1);
         sql.push_str(");");
-        println!("SQL {}", sql);
+
+        log::info!("Creating table with SQL {}", sql);
+
         self.connection.execute(sql).expect("Can't create table");
     }
     fn delete_db(config: &Config) {
@@ -61,11 +66,12 @@ impl DatabaseInterface for SQLLite3Interface {
             Err(e) => error!("Error when deleting sqllite3 database: {}", e)
         }
     }
-    fn execute_query(&self, _query: String) {
+    fn execute_raw_query(&self, _query: String) {
         
     }
 }
 
 // may be negative side effects
-unsafe impl Send for SQLLite3Interface {}
-unsafe impl Sync for SQLLite3Interface {}
+// must be implemented for 'object safety' over threads
+unsafe impl Send for SQLite3Interface {}
+unsafe impl Sync for SQLite3Interface {}
