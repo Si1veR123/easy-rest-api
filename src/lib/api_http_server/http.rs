@@ -14,7 +14,7 @@ async fn handle(
     addr: SocketAddr,
     req: Request<Body>
 ) -> Result<Response<Body>, Infallible> {
-    context.handle_http_request(req, addr)
+    context.handle_http_request(req, addr).await
 }
 
 pub async fn run_app_server(addr: SocketAddr, app: App) {

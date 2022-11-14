@@ -1,34 +1,123 @@
 use std::collections::HashMap;
+use hyper::body::to_bytes;
 use sqlite3::Cursor;
+use json::{parse, JsonValue};
 
-pub enum HttpAction {
+#[derive(PartialEq)]
+pub enum HttpMethod {
     GET,
     POST,
     PUT,
     DELETE,
-    PATCH
+    PATCH,
+    INVALID
 }
 
 // Used to convert the incoming HTTP request to a SQL statement
+#[async_trait::async_trait]
 pub trait Query<'a, T, A> {
-    fn execute_sql(&'a self, connection: T) -> A;
+    // TODO: restructure to return errors with strings and log in caller function
+    async fn from_request(request: &hyper::Request<hyper::Body>, table: &str) -> Result<Self, ()>
+        where Self: Sized;
+    fn execute_sql(&'a self, connection: T) -> Result<A, ()>;
 }
 
 pub struct Sqlite3Query {
-    pub action: HttpAction,
+    pub method: HttpMethod,
     pub table_name: String,
     pub data: HashMap<String, String>,
     pub filter: HashMap<String, String>,
 }
 
+#[async_trait::async_trait]
 impl<'a> Query<'a, &'a sqlite3::Connection, sqlite3::Result<Cursor<'a>>> for Sqlite3Query {
-    fn execute_sql(&'a self, connection: &'a sqlite3::Connection) -> sqlite3::Result<Cursor<'a>> {
-        match self.action {
-            HttpAction::GET => self.construct_get_sql(connection),
-            HttpAction::POST => self.construct_post_sql(connection),
-            HttpAction::PUT => self.construct_put_sql(connection),
-            HttpAction::DELETE => self.construct_delete_sql(connection),
-            HttpAction::PATCH => self.construct_patch_sql(connection),
+    async fn from_request(request: &hyper::Request<hyper::Body>, table: &str) -> Result<Self, ()> {
+        let method = match request.method().clone() {
+            hyper::Method::GET => HttpMethod::GET,
+            hyper::Method::PATCH => HttpMethod::PATCH,
+            hyper::Method::DELETE => HttpMethod::DELETE,
+            hyper::Method::POST => HttpMethod::POST,
+            hyper::Method::PUT => HttpMethod::PUT,
+            _ => HttpMethod::INVALID,
+        };
+
+        if method == HttpMethod::INVALID {
+            return Err(())
+        }
+
+        // TODO: possible vunerability in to_bytes
+        let body_read_result = to_bytes(request.body_mut()).await;
+        if body_read_result.is_err() {
+            log::error!("Error reading request body");
+            return Err(())
+        }
+        let body = String::from_utf8(body_read_result.unwrap().into_iter().collect());
+        if body.is_err() {
+            log::error!("Error creating string from request body bytes");
+            return Err(())
+        }
+
+        let parsed = parse(
+            &body.unwrap()
+        );
+        if parsed.is_err() {
+            log::error!("Error parsing json body");
+            return Err(())
+        }
+        
+        let content = parsed.unwrap();
+        let columns = content.remove("columns");
+        if !columns.is_array() {
+            log::error!("Error getting 'columns' from json (not present or wrong type)");
+            return Err(());
+        }
+
+        let mut data_hashmap = HashMap::new();
+        for col in columns.members() {
+            let col_as_str = col.as_str();
+
+            if col_as_str.is_none() {
+                log::error!("Columns json contains non-string");
+                return Err(())
+            }
+
+            data_hashmap.insert(col_as_str.unwrap().to_string(), "".to_string());
+        }
+
+        let filters = content.remove("filters");
+        if !filters.is_object() {
+            log::error!("Error getting 'filters' from json (not present or wrong type)");
+            return Err(())
+        }
+
+        let mut filters_hashmap = HashMap::new();
+        for filter in filters.entries() {
+            let filter_val = filter.1.as_str();
+            if filter_val.is_none() {
+                log::error!("Filters json contains non-string");
+                return Err(())
+            }
+
+            filters_hashmap.insert(filter.0.to_string(), filter_val.unwrap().to_string());
+        }
+
+        Ok(Self {
+            method,
+            table_name: table.to_string(),
+            data: data_hashmap,
+            filter: filters_hashmap
+
+        })
+    }
+
+    fn execute_sql(&'a self, connection: &'a sqlite3::Connection) -> Result<sqlite3::Result<Cursor<'a>>, ()> {
+        match self.method {
+            HttpMethod::GET => Ok(self.construct_get_sql(connection)),
+            HttpMethod::POST => Ok(self.construct_post_sql(connection)),
+            HttpMethod::PUT => Ok(self.construct_put_sql(connection)),
+            HttpMethod::DELETE => Ok(self.construct_delete_sql(connection)),
+            HttpMethod::PATCH => Ok(self.construct_patch_sql(connection)),
+            _  => Err(())
         }
     }
 }
@@ -114,7 +203,7 @@ mod tests {
         //filter.insert("filter3".to_string(), "value3".to_string());
 
         let q = Sqlite3Query {
-            action: HttpAction::GET,
+            method: HttpMethod::GET,
             table_name: "test".to_string(),
             data,
             filter

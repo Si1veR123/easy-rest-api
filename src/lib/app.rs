@@ -26,7 +26,7 @@ impl App {
         None
     }
 
-    pub fn handle_http_request(&self, req: Request<Body>, addr: SocketAddr) -> Result<Response<Body>, Infallible> {
+    pub async fn handle_http_request(&self, req: Request<Body>, addr: SocketAddr) -> Result<Response<Body>, Infallible> {
         log::info!("Request ({}) at {}", addr, req.uri());
 
         let table_name = self.match_route(req.uri().to_string());
@@ -46,7 +46,7 @@ impl App {
                 response.unwrap()
             },
             Some(table_name) => {
-                Response::new(Body::from(format!("FOUND ROUTE {}", table_name)))
+                self.database_interface.process_api_request(req, &table_name).await
             }
         };
         Ok(response)

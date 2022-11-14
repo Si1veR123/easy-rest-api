@@ -1,5 +1,13 @@
 #[derive(Clone)]
-pub enum DataType {
+pub enum SQLType {
+    Null,
+    Integer,
+    Real,
+    Text,
+}
+
+#[derive(Clone)]
+pub enum SQLDataType {
     Null,
     Integer(i32),
     Real(f32),
@@ -11,26 +19,26 @@ pub trait SerialiseField {
 }
 
 pub trait DeserialiseField {
-    fn deserialise(database_val: DataType) -> Self;
+    fn deserialise(database_val: SQLDataType) -> Self;
 }
 
 pub struct DefaultTypeField {
-    value: DataType,
+    value: SQLDataType,
 }
 
 impl SerialiseField for DefaultTypeField {
     fn serialise(&self) -> String {
         match &self.value {
-            DataType::Null => "null".to_string(),
-            DataType::Integer(i) => i.to_string(),
-            DataType::Real(r) => r.to_string(),
-            DataType::Text(t) => t.clone(),
+            SQLDataType::Null => "null".to_string(),
+            SQLDataType::Integer(i) => i.to_string(),
+            SQLDataType::Real(r) => r.to_string(),
+            SQLDataType::Text(t) => t.clone(),
         }
     }
 }
 
 impl DeserialiseField for DefaultTypeField {
-    fn deserialise(database_val: DataType) -> Self {
+    fn deserialise(database_val: SQLDataType) -> Self {
         Self { value: database_val }
     }
 }

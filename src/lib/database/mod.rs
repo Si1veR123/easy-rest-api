@@ -1,4 +1,4 @@
 pub mod interfaces;
-pub mod model;
+pub mod table;
 pub mod fields;
 pub mod query;
