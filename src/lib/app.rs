@@ -3,7 +3,7 @@ use std::convert::Infallible;
 use std::net::SocketAddr;
 
 use super::api_http_server::routing::Route;
-use super::middleware::Middleware;
+use super::api_http_server::middleware::Middleware;
 use super::database::interfaces::DatabaseInterface;
 
 use hyper::{Body, Request, Response, StatusCode};
@@ -27,9 +27,15 @@ impl App {
     }
 
     pub async fn handle_http_request(&self, req: Request<Body>, addr: SocketAddr) -> Result<Response<Body>, Infallible> {
+        let mut req = req;
+
         log::info!("Request ({}) at {}", addr, req.uri());
 
         let table_name = self.match_route(req.uri().to_string());
+
+        for middleware in &self.middleware {
+            middleware.process_request(&mut req);
+        }
 
         let response: Response<Body> = match table_name {
             None => {

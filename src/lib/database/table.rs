@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use super::fields::{SQLType};
+use super::interfaces::SQLType;
 
 pub struct Table {
     name: String,

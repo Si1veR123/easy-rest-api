@@ -1,12 +1,19 @@
-use std::{collections::HashMap};
+use std::collections::HashMap;
 
 use std::fs;
-use super::fields::SQLDataType;
-use super::fields::SQLDataType::*;
 use super::query::{Sqlite3Query, Query};
 use sqlite3::{open, Connection};
 
-use log::{info, error};
+#[derive(Clone)]
+pub enum SQLType {
+    Null,
+    Integer,
+    Real,
+    Text,
+}
+
+
+use hyper::{Body, Request, Response};
 
 type Config = HashMap<String, String>;
 
@@ -14,11 +21,11 @@ type Config = HashMap<String, String>;
 pub trait DatabaseInterface {
     fn connect(config: &Config) -> Self
         where Self: Sized;
-    fn table_from_types(&self, table_name: String, types: Vec<(String, SQLDataType)>);
+    fn table_from_types(&self, table_name: String, types: Vec<(String, SQLType)>);
     fn delete_db(config: &Config)
         where Self: Sized;
     fn execute_raw_query(&self, query: String);
-    async fn process_api_request(&self, request: hyper::Request<hyper::Body>, table: &str) -> hyper::Response<hyper::Body>;
+    async fn process_api_request(&self, request: Request<Body>, table: &str) -> Response<Body>;
 }
 
 pub struct SQLite3Interface {
@@ -36,16 +43,16 @@ impl DatabaseInterface for SQLite3Interface {
             connection
         }
     }
-    fn table_from_types(&self, table_name: String, types: Vec<(String, SQLDataType)>) {
+    fn table_from_types(&self, table_name: String, types: Vec<(String, SQLType)>) {
         let mut sql = format!("CREATE TABLE IF NOT EXISTS {} (", table_name);
 
         for (col_name, data_type) in types {
             sql.push_str(&col_name);
             let dtype = match data_type {
-                Null => " NULL",
-                Integer(_) => " INTEGER",
-                Real(_) => " REAL",
-                Text(_) => " TEXT",
+                SQLType::Null => " NULL",
+                SQLType::Integer => " INTEGER",
+                SQLType::Real => " REAL",
+                SQLType::Text => " TEXT",
             };
             sql.push_str(dtype);
             sql.push_str(", ")
@@ -64,19 +71,28 @@ impl DatabaseInterface for SQLite3Interface {
         let result = fs::remove_file(db_path);
 
         match result {
-            Ok(_) => info!("Deleted sqllite3 database"),
-            Err(e) => error!("Error when deleting sqllite3 database: {}", e)
+            Ok(_) => log::info!("Deleted sqllite3 database"),
+            Err(e) => log::error!("Error when deleting sqllite3 database: {}", e)
         }
     }
     fn execute_raw_query(&self, _query: String) {
         
     }
-    async fn process_api_request(&self, request: hyper::Request<hyper::Body>, table: &str) -> hyper::Response<hyper::Body> {
+    async fn process_api_request(&self, request: Request<Body>, table: &str) -> Response<Body> {
         let query = Sqlite3Query::from_request(&request, table).await;
 
         if query.is_err() {
             log::error!("Failed to construct SQL query from request");
+            // return error response
         }
+
+        let cursor = query.unwrap().execute_sql(&self.connection);
+        if cursor.is_err() {
+            log::error!("Failed to execute SQL query");
+            // return error response
+        }
+
+
     }
 }
 

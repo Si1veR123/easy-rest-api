@@ -1,7 +1,14 @@
 use std::collections::HashMap;
+
 use hyper::body::to_bytes;
-use sqlite3::Cursor;
-use json::{parse, JsonValue};
+use hyper::{Request, Body};
+
+use sqlite3::{Cursor, Connection};
+use sqlite3::Result as SqlResult;
+use sqlite3::Value as SqlValue;
+use sqlite3::Error as SqlError;
+
+use json::parse;
 
 #[derive(PartialEq)]
 pub enum HttpMethod {
@@ -17,9 +24,9 @@ pub enum HttpMethod {
 #[async_trait::async_trait]
 pub trait Query<'a, T, A> {
     // TODO: restructure to return errors with strings and log in caller function
-    async fn from_request(request: &hyper::Request<hyper::Body>, table: &str) -> Result<Self, ()>
+    async fn from_request(request: &Request<Body>, table: &str) -> Result<Self, ()>
         where Self: Sized;
-    fn execute_sql(&'a self, connection: T) -> Result<A, ()>;
+    fn execute_sql(&'a self, connection: T) -> A;
 }
 
 pub struct Sqlite3Query {
@@ -30,8 +37,8 @@ pub struct Sqlite3Query {
 }
 
 #[async_trait::async_trait]
-impl<'a> Query<'a, &'a sqlite3::Connection, sqlite3::Result<Cursor<'a>>> for Sqlite3Query {
-    async fn from_request(request: &hyper::Request<hyper::Body>, table: &str) -> Result<Self, ()> {
+impl<'a> Query<'a, &'a Connection, SqlResult<Cursor<'a>>> for Sqlite3Query {
+    async fn from_request(request: &Request<Body>, table: &str) -> Result<Self, ()> {
         let method = match request.method().clone() {
             hyper::Method::GET => HttpMethod::GET,
             hyper::Method::PATCH => HttpMethod::PATCH,
@@ -67,21 +74,21 @@ impl<'a> Query<'a, &'a sqlite3::Connection, sqlite3::Result<Cursor<'a>>> for Sql
         
         let content = parsed.unwrap();
         let columns = content.remove("columns");
-        if !columns.is_array() {
+        if !columns.is_object() {
             log::error!("Error getting 'columns' from json (not present or wrong type)");
             return Err(());
         }
 
         let mut data_hashmap = HashMap::new();
-        for col in columns.members() {
-            let col_as_str = col.as_str();
+        for col in columns.entries() {
+            let col_as_str = col.1.as_str();
 
             if col_as_str.is_none() {
                 log::error!("Columns json contains non-string");
                 return Err(())
             }
 
-            data_hashmap.insert(col_as_str.unwrap().to_string(), "".to_string());
+            data_hashmap.insert(col.0.to_string(), col_as_str.unwrap().to_string());
         }
 
         let filters = content.remove("filters");
@@ -110,41 +117,43 @@ impl<'a> Query<'a, &'a sqlite3::Connection, sqlite3::Result<Cursor<'a>>> for Sql
         })
     }
 
-    fn execute_sql(&'a self, connection: &'a sqlite3::Connection) -> Result<sqlite3::Result<Cursor<'a>>, ()> {
+    fn execute_sql(&'a self, connection: &'a Connection) -> SqlResult<Cursor<'a>> {
         match self.method {
-            HttpMethod::GET => Ok(self.construct_get_sql(connection)),
-            HttpMethod::POST => Ok(self.construct_post_sql(connection)),
-            HttpMethod::PUT => Ok(self.construct_put_sql(connection)),
-            HttpMethod::DELETE => Ok(self.construct_delete_sql(connection)),
-            HttpMethod::PATCH => Ok(self.construct_patch_sql(connection)),
-            _  => Err(())
+            HttpMethod::GET => self.construct_get_sql(connection),
+            HttpMethod::POST => self.construct_post_sql(connection),
+            HttpMethod::PUT => self.construct_put_sql(connection),
+            HttpMethod::DELETE => self.construct_delete_sql(connection),
+            HttpMethod::PATCH => self.construct_patch_sql(connection),
+            _  => SqlResult::Err(
+                SqlError {code: None, message: Some("Invalid method".to_string())}
+            )
         }
     }
 }
 
 impl<'a> Sqlite3Query {
-    fn construct_get_sql(&'a self, connection: &'a sqlite3::Connection) -> sqlite3::Result<Cursor> {
-        let mut bindings: Vec<sqlite3::Value> = Vec::new();
+    fn construct_get_sql(&'a self, connection: &'a Connection) -> SqlResult<Cursor> {
+        let mut bindings: Vec<SqlValue> = Vec::new();
         let mut select_builder = "SELECT ".to_string();
 
         // in select, only key of hashmap has values, as only need column names
         for d in &self.data {
             select_builder.push_str("?, ");
-            bindings.push(sqlite3::Value::String(d.0.clone()));
+            bindings.push(SqlValue::String(d.0.clone()));
         }
         select_builder.remove(select_builder.len()-1);
         select_builder.remove(select_builder.len()-1);
 
         select_builder.push_str(" FROM ?");
-        bindings.push(sqlite3::Value::String(self.table_name.clone()));
+        bindings.push(SqlValue::String(self.table_name.clone()));
 
         if self.filter.len() > 0 {
             select_builder.push_str(" WHERE ");
 
             for filter in &self.filter {
                 select_builder.push_str("?=? AND ");
-                bindings.push(sqlite3::Value::String(filter.0.clone()));
-                bindings.push(sqlite3::Value::String(filter.1.clone()));
+                bindings.push(SqlValue::String(filter.0.clone()));
+                bindings.push(SqlValue::String(filter.1.clone()));
             }
 
             select_builder.remove(select_builder.len()-1);
@@ -170,19 +179,19 @@ impl<'a> Sqlite3Query {
         Ok(bound)
     }
 
-    fn construct_post_sql(&'a self, connection: &'a sqlite3::Connection) -> sqlite3::Result<Cursor> {
+    fn construct_post_sql(&'a self, connection: &'a Connection) -> SqlResult<Cursor> {
         Ok(connection.prepare("INVALID TEST STATEMENT").unwrap().cursor())
     }
 
-    fn construct_put_sql(&'a self, connection: &'a sqlite3::Connection) -> sqlite3::Result<Cursor> {
+    fn construct_put_sql(&'a self, connection: &'a Connection) -> SqlResult<Cursor> {
         Ok(connection.prepare("INVALID TEST STATEMENT").unwrap().cursor())
     }
     
-    fn construct_delete_sql(&'a self, connection: &'a sqlite3::Connection) -> sqlite3::Result<Cursor> {
+    fn construct_delete_sql(&'a self, connection: &'a Connection) -> SqlResult<Cursor> {
         Ok(connection.prepare("INVALID TEST STATEMENT").unwrap().cursor())
     }
 
-    fn construct_patch_sql(&'a self, connection: &'a sqlite3::Connection) -> sqlite3::Result<Cursor> {
+    fn construct_patch_sql(&'a self, connection: &'a Connection) -> SqlResult<Cursor> {
         Ok(connection.prepare("INVALID TEST STATEMENT").unwrap().cursor())
     }
 }

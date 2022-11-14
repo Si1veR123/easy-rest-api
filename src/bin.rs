@@ -2,10 +2,8 @@ use clap::{arg, command, value_parser, Arg, ArgAction};
 
 use std::net::SocketAddr;
 
-use std::sync::Mutex;
-
-use lib::api_http_server::routing::BasicRoute;
 use rest_api as lib;
+use lib::api_http_server::routing::BasicRoute;
 use lib::enable_logging;
 use lib::config_parser::read_config;
 use lib::database::interfaces::{SQLite3Interface, DatabaseInterface};
@@ -48,7 +46,7 @@ async fn main() {
     );
 
     let app = App {
-        routes: routes,
+        routes,
         middleware: vec![],
         database_interface: Box::new(interface)
     };

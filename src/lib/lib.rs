@@ -2,7 +2,6 @@ pub mod config_parser;
 pub mod database;
 pub mod api_http_server;
 pub mod app;
-pub mod middleware;
 
 use std::collections::HashMap;
 
