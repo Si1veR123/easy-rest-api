@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::fmt::Display;
 
 use hyper::body::to_bytes;
 use hyper::{Request, Body, Method};
@@ -22,11 +23,22 @@ pub enum HttpMethod {
     INVALID
 }
 
+#[derive(Debug)]
+pub struct QueryErr (
+    pub String,  // description
+    pub bool,  // server fault?
+);
+
+impl Display for QueryErr {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
 // Used to convert the incoming HTTP request to a SQL statement
 #[async_trait::async_trait]
 pub trait Query<'a, T, A> {
-    // TODO: restructure to return errors with strings and log in caller function
-    async fn from_request(request: &mut Request<Body>, table: &TableSchema) -> Result<Self, ()>
+    async fn from_request(request: &mut Request<Body>, table: &TableSchema) -> Result<Self, QueryErr>
         where Self: Sized;
     fn execute_sql(&'a self, connection: T) -> A;
 }
@@ -40,7 +52,8 @@ pub struct Sqlite3Query {
 
 #[async_trait::async_trait]
 impl<'a> Query<'a, &'a Connection, SqlResult<Cursor<'a>>> for Sqlite3Query {
-    async fn from_request(request: &mut Request<Body>, table: &TableSchema) -> Result<Self, ()> {
+    
+    async fn from_request(request: &mut Request<Body>, table: &TableSchema) -> Result<Self, QueryErr> {
         let method = match request.method().clone() {
             Method::GET => HttpMethod::GET,
             Method::PATCH => HttpMethod::PATCH,
@@ -50,7 +63,7 @@ impl<'a> Query<'a, &'a Connection, SqlResult<Cursor<'a>>> for Sqlite3Query {
         };
 
         if method == HttpMethod::INVALID {
-            return Err(())
+            return Err(QueryErr("Invalid Method".to_string(), false))
         }
 
         if method == HttpMethod::GET {
@@ -84,28 +97,24 @@ impl<'a> Query<'a, &'a Connection, SqlResult<Cursor<'a>>> for Sqlite3Query {
         // TODO: possible vunerability in to_bytes
         let body_read_result = to_bytes(request.body_mut()).await;
         if body_read_result.is_err() {
-            log::error!("Error reading request body");
-            return Err(())
+            return Err(QueryErr("Error reading request body".to_string(), true))
         }
         let body = String::from_utf8(body_read_result.unwrap().into_iter().collect());
         if body.is_err() {
-            log::error!("Error creating string from request body bytes");
-            return Err(())
+            return Err(QueryErr("Error creating string from request body bytes".to_string(), true))
         }
 
         let parsed = parse(
             &body.unwrap()
         );
         if parsed.is_err() {
-            log::error!("Error parsing json body");
-            return Err(())
+            return Err(QueryErr("Error parsing json body".to_string(), false))
         }
         
         let mut content = parsed.unwrap();
         let columns = content.remove("columns");
         if !columns.is_object() {
-            log::error!("Error getting 'columns' from json (not present or wrong type)");
-            return Err(());
+            return Err(QueryErr("Error getting 'columns' from json (not present or wrong type)".to_string(), false));
         }
 
         let mut data_hashmap = HashMap::new();
@@ -113,8 +122,7 @@ impl<'a> Query<'a, &'a Connection, SqlResult<Cursor<'a>>> for Sqlite3Query {
             let col_as_str = col.1.as_str();
 
             if col_as_str.is_none() {
-                log::error!("Columns json contains non-string");
-                return Err(())
+                return Err(QueryErr("Columns json contains non-string".to_string(), false))
             }
 
             data_hashmap.insert(col.0.to_string(), col_as_str.unwrap().to_string());
@@ -122,16 +130,14 @@ impl<'a> Query<'a, &'a Connection, SqlResult<Cursor<'a>>> for Sqlite3Query {
 
         let filters = content.remove("filters");
         if !filters.is_object() {
-            log::error!("Error getting 'filters' from json (not present or wrong type)");
-            return Err(())
+            return Err(QueryErr("Error getting 'filters' from json (not present or wrong type)".to_string(), false))
         }
 
         let mut filters_hashmap = HashMap::new();
         for filter in filters.entries() {
             let filter_val = filter.1.as_str();
             if filter_val.is_none() {
-                log::error!("Filters json contains non-string");
-                return Err(())
+                return Err(QueryErr("Filters json contains non-string".to_string(), false))
             }
 
             filters_hashmap.insert(filter.0.to_string(), filter_val.unwrap().to_string());
@@ -183,13 +189,10 @@ impl<'a> Sqlite3Query {
             select_builder.remove(select_builder.len()-1);
         }
 
-        println!("Executing {}", select_builder);
-
         let statement = connection.prepare(select_builder);
         
         if statement.is_err() {
             let error = statement.err().unwrap();
-            log::error!("Error constructing GET: {}", error);
             return Err(error)
         }
 
@@ -200,10 +203,6 @@ impl<'a> Sqlite3Query {
     }
 
     fn construct_post_sql(&'a self, connection: &'a Connection) -> SqlResult<Cursor> {
-        Ok(connection.prepare("INVALID TEST STATEMENT").unwrap().cursor())
-    }
-
-    fn construct_put_sql(&'a self, connection: &'a Connection) -> SqlResult<Cursor> {
         Ok(connection.prepare("INVALID TEST STATEMENT").unwrap().cursor())
     }
     

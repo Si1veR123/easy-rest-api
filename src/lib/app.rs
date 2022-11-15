@@ -41,7 +41,7 @@ impl App {
 
         let mut req = req;
 
-        log::info!("Request ({}) at {}", addr, req.uri());
+        log::info!("{} Request ({}) at {}", req.method(), addr, req.uri());
 
         let (base_uri, _) = split_uri_args(req.uri().to_string());
 
@@ -53,17 +53,11 @@ impl App {
 
         let response: Response<Body> = match table_schema {
             None => {
-                let response = Response::builder()
+                Response::builder()
                     .status(StatusCode::NOT_FOUND)
                     .body(
                         Body::from("Route not found")
-                    );
-                
-                if response.is_err() {
-                    log::error!("Error creating 404 response");
-                    return Ok(Response::new(Body::from("Error creating response")));
-                };
-                response.unwrap()
+                    ).unwrap()
             },
             Some(table_schema) => {
                 self.database_interface.process_api_request(&mut req, table_schema).await

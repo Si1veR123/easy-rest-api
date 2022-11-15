@@ -35,6 +35,6 @@ pub async fn run_app_server(addr: SocketAddr, app: App) {
     let server = Server::bind(&addr).serve(make_service);
 
     if let Err(e) = server.await {
-        log::error!("server error: {}", e);
+        log::error!("Server Panic: {}", e);
     }
 }

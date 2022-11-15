@@ -2,14 +2,12 @@ use std::collections::HashMap;
 use std::path::Path;
 use std::fs;
 
-use sqlite3::{open, Connection};
 use super::table_schema::TableSchema;
 use super::response::{Sqlite3ResponseBuilder, ResponseBuilder};
-use super::query::{Sqlite3Query, Query};
+use super::query::{Sqlite3Query, Query, QueryErr};
 
+use sqlite3::{open, Connection};
 use hyper::{Body, Request, Response};
-
-type Config = HashMap<String, String>;
 
 #[derive(Clone, Debug)]
 pub enum SQLType {
@@ -18,6 +16,9 @@ pub enum SQLType {
     Real,
     Text,
 }
+
+
+type Config = HashMap<String, String>;
 
 #[async_trait::async_trait]
 pub trait DatabaseInterface {
@@ -42,7 +43,7 @@ impl DatabaseInterface for SQLite3Interface {
 
         let existing = Path::new(db_path).exists();
 
-        let connection = open(db_path).expect(&format!("Can't open sqllite3 database at {}", db_path));
+        let connection = open(db_path).expect(&format!("Can't open sqlite3 database at: {}", db_path));
         
         log::info!("Connected to database at {}", db_path);
         (
@@ -82,30 +83,54 @@ impl DatabaseInterface for SQLite3Interface {
 
         self.connection.execute(sql).expect("Can't create table");
     }
+    
     fn delete_db(config: &Config) {
         let db_path = config.get("database_path").expect("Can't find 'database_path' config");
         let result = fs::remove_file(db_path);
 
         match result {
-            Ok(_) => log::info!("Deleted sqllite3 database"),
-            Err(e) => log::error!("Error when deleting sqllite3 database: {}", e)
+            Ok(_) => log::info!("Deleted sqlite3 database"),
+            Err(e) => log::error!("Error when deleting sqlite3 database: {}", e)
         }
     }
+
     async fn process_api_request(&self, request: &mut Request<Body>, table: &TableSchema) -> Response<Body> {
+        // GENERATE QUERY
         let query = Sqlite3Query::from_request(request, table).await;
 
         if query.is_err() {
-            log::error!("Failed to construct SQL query from request");
-            // return error response
+            let error = query.err().unwrap();
+
+            if error.1 {
+                log::warn!("{}", error.0);
+                return Response::builder()
+                    .status(500)
+                    .body(Body::from("Server Error Encountered"))
+                    .unwrap();
+            } else {
+                log::debug!("{}", error.0);
+                return Response::builder()
+                    .status(400)
+                    .body(Body::from("Client Error Encountered"))
+                    .unwrap();
+            }
         }
 
+        // EXECUTE QUERY
         let query = query.unwrap();
         let cursor = query.execute_sql(&self.connection);
 
         if cursor.is_err() {
-            log::error!("Failed to execute SQL query");
-            // return error response
+            let error = cursor.err().unwrap();
+            log::warn!("{}", error);
+            
+            return Response::builder()
+                    .status(500)
+                    .body(Body::from("Server Error Encountered"))
+                    .unwrap();
         }
+
+        // CREATE RESPONSE FROM DATA
         let mut all_data = Vec::new();
         let mut c = cursor.unwrap();
         while let Ok(Some(d)) = c.next() {
