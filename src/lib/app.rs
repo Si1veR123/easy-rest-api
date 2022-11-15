@@ -2,7 +2,9 @@
 use std::convert::Infallible;
 use std::net::SocketAddr;
 
-use super::api_http_server::routing::Route;
+use super::database::table_schema::TableSchema;
+
+use super::api_http_server::routing::{Route, split_uri_args};
 use super::api_http_server::middleware::Middleware;
 use super::database::interfaces::DatabaseInterface;
 
@@ -16,28 +18,40 @@ pub struct App {
 }
 
 impl App {
-    fn match_route(&self, uri: String) -> Option<String> {
+    fn match_route(&self, uri: String) -> Option<&TableSchema> {
         for route in &self.routes {
-            let route = route.matches_uri(uri.clone());
-            if route.is_some() {
-                return route
+            let route_match = route.matches_uri(uri.clone());
+            if route_match {
+                return Some(route.get_schema())
             }
         }
         None
     }
 
     pub async fn handle_http_request(&self, req: Request<Body>, addr: SocketAddr) -> Result<Response<Body>, Infallible> {
+        if req.method() == hyper::Method::OPTIONS {
+            let response = Response::builder()
+                .header("Allow", "OPTIONS, GET, POST, DELETE, PATCH")
+                .header("Accept", "application/json")
+                .body(
+                    Body::empty()
+                );
+            return Ok(response.unwrap())
+        }
+
         let mut req = req;
 
         log::info!("Request ({}) at {}", addr, req.uri());
 
-        let table_name = self.match_route(req.uri().to_string());
+        let (base_uri, _) = split_uri_args(req.uri().to_string());
+
+        let table_schema = self.match_route(base_uri);
 
         for middleware in &self.middleware {
             middleware.process_request(&mut req);
         }
 
-        let response: Response<Body> = match table_name {
+        let response: Response<Body> = match table_schema {
             None => {
                 let response = Response::builder()
                     .status(StatusCode::NOT_FOUND)
@@ -51,8 +65,8 @@ impl App {
                 };
                 response.unwrap()
             },
-            Some(table_name) => {
-                self.database_interface.process_api_request(&mut req, &table_name).await
+            Some(table_schema) => {
+                self.database_interface.process_api_request(&mut req, table_schema).await
             }
         };
         Ok(response)

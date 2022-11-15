@@ -1,12 +1,15 @@
 use std::collections::HashMap;
 
 use hyper::body::to_bytes;
-use hyper::{Request, Body};
+use hyper::{Request, Body, Method};
 
 use sqlite3::{Cursor, Connection};
 use sqlite3::Result as SqlResult;
 use sqlite3::Value as SqlValue;
 use sqlite3::Error as SqlError;
+
+use super::super::api_http_server::routing::split_uri_args;
+use super::table_schema::TableSchema;
 
 use json::parse;
 
@@ -14,7 +17,6 @@ use json::parse;
 pub enum HttpMethod {
     GET,
     POST,
-    PUT,
     DELETE,
     PATCH,
     INVALID
@@ -24,7 +26,7 @@ pub enum HttpMethod {
 #[async_trait::async_trait]
 pub trait Query<'a, T, A> {
     // TODO: restructure to return errors with strings and log in caller function
-    async fn from_request(request: &mut Request<Body>, table: &str) -> Result<Self, ()>
+    async fn from_request(request: &mut Request<Body>, table: &TableSchema) -> Result<Self, ()>
         where Self: Sized;
     fn execute_sql(&'a self, connection: T) -> A;
 }
@@ -32,24 +34,51 @@ pub trait Query<'a, T, A> {
 pub struct Sqlite3Query {
     pub method: HttpMethod,
     pub table_name: String,
-    pub data: HashMap<String, String>,
+    pub fields_data: HashMap<String, String>,
     pub filter: HashMap<String, String>,
 }
 
 #[async_trait::async_trait]
 impl<'a> Query<'a, &'a Connection, SqlResult<Cursor<'a>>> for Sqlite3Query {
-    async fn from_request(request: &mut Request<Body>, table: &str) -> Result<Self, ()> {
+    async fn from_request(request: &mut Request<Body>, table: &TableSchema) -> Result<Self, ()> {
         let method = match request.method().clone() {
-            hyper::Method::GET => HttpMethod::GET,
-            hyper::Method::PATCH => HttpMethod::PATCH,
-            hyper::Method::DELETE => HttpMethod::DELETE,
-            hyper::Method::POST => HttpMethod::POST,
-            hyper::Method::PUT => HttpMethod::PUT,
+            Method::GET => HttpMethod::GET,
+            Method::PATCH => HttpMethod::PATCH,
+            Method::DELETE => HttpMethod::DELETE,
+            Method::POST => HttpMethod::POST,
             _ => HttpMethod::INVALID,
         };
 
         if method == HttpMethod::INVALID {
             return Err(())
+        }
+
+        if method == HttpMethod::GET {
+            // GET is constructed from uri args
+
+            let (_, uri_args) = split_uri_args(request.uri().to_string());
+
+            let mut uri_args_parsed: HashMap<String, String> = HashMap::new();
+            for arg in uri_args.split('&') {
+                let res = arg.split_once('=');
+
+                if res.is_none() {
+                    continue;
+                }
+
+                let (left, right) = res.unwrap();
+
+                if table.field_exists(left) {
+                    uri_args_parsed.insert(left.to_string(), right.to_string());
+                }
+            }
+
+            return Ok(Self {
+                method: HttpMethod::GET,
+                table_name: table.name.clone(),
+                fields_data: HashMap::new(),
+                filter: uri_args_parsed,
+            })
         }
 
         // TODO: possible vunerability in to_bytes
@@ -110,10 +139,9 @@ impl<'a> Query<'a, &'a Connection, SqlResult<Cursor<'a>>> for Sqlite3Query {
 
         Ok(Self {
             method,
-            table_name: table.to_string(),
-            data: data_hashmap,
+            table_name: table.name.clone(),
+            fields_data: data_hashmap,
             filter: filters_hashmap
-
         })
     }
 
@@ -121,7 +149,6 @@ impl<'a> Query<'a, &'a Connection, SqlResult<Cursor<'a>>> for Sqlite3Query {
         match self.method {
             HttpMethod::GET => self.construct_get_sql(connection),
             HttpMethod::POST => self.construct_post_sql(connection),
-            HttpMethod::PUT => self.construct_put_sql(connection),
             HttpMethod::DELETE => self.construct_delete_sql(connection),
             HttpMethod::PATCH => self.construct_patch_sql(connection),
             _  => SqlResult::Err(
@@ -134,25 +161,18 @@ impl<'a> Query<'a, &'a Connection, SqlResult<Cursor<'a>>> for Sqlite3Query {
 impl<'a> Sqlite3Query {
     fn construct_get_sql(&'a self, connection: &'a Connection) -> SqlResult<Cursor> {
         let mut bindings: Vec<SqlValue> = Vec::new();
-        let mut select_builder = "SELECT ".to_string();
+        let mut select_builder = "SELECT *".to_string();
 
-        // in select, only key of hashmap has values, as only need column names
-        for d in &self.data {
-            select_builder.push_str("?, ");
-            bindings.push(SqlValue::String(d.0.clone()));
-        }
-        select_builder.remove(select_builder.len()-1);
-        select_builder.remove(select_builder.len()-1);
-
-        select_builder.push_str(" FROM ?");
-        bindings.push(SqlValue::String(self.table_name.clone()));
+        select_builder.push_str(&format!(" FROM {}", self.table_name.clone()));
 
         if self.filter.len() > 0 {
             select_builder.push_str(" WHERE ");
 
             for filter in &self.filter {
-                select_builder.push_str("?=? AND ");
-                bindings.push(SqlValue::String(filter.0.clone()));
+                // fields MUST be checked to be valid for the table when constructing query object
+                // or vulnerable to SQL injection
+                select_builder.push_str( &format!("{}=? AND ", filter.0) );
+
                 bindings.push(SqlValue::String(filter.1.clone()));
             }
 
@@ -166,7 +186,7 @@ impl<'a> Sqlite3Query {
         println!("Executing {}", select_builder);
 
         let statement = connection.prepare(select_builder);
-        println!("{:?}", bindings);
+        
         if statement.is_err() {
             let error = statement.err().unwrap();
             log::error!("Error constructing GET: {}", error);
@@ -174,7 +194,7 @@ impl<'a> Sqlite3Query {
         }
 
         let mut bound = statement.unwrap().cursor();
-        bound.bind(bindings.as_slice());
+        let _res = bound.bind(bindings.as_slice());
 
         Ok(bound)
     }
@@ -193,46 +213,5 @@ impl<'a> Sqlite3Query {
 
     fn construct_patch_sql(&'a self, connection: &'a Connection) -> SqlResult<Cursor> {
         Ok(connection.prepare("INVALID TEST STATEMENT").unwrap().cursor())
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_select_sql_gen() {
-        let mut data = HashMap::new();
-        data.insert("data1".to_string(), "".to_string());
-        data.insert("data2".to_string(), "".to_string());
-
-        let mut filter = HashMap::new();
-        //filter.insert("filter1".to_string(), "value1".to_string());
-        //filter.insert("filter2".to_string(), "value2".to_string());
-        //filter.insert("filter3".to_string(), "value3".to_string());
-
-        let q = Sqlite3Query {
-            method: HttpMethod::GET,
-            table_name: "test".to_string(),
-            data,
-            filter
-        };
-
-        let connection = sqlite3::open(":memory:").unwrap();
-
-        connection.execute(
-            "
-            CREATE TABLE test (data1 TEXT, data2 TEXT);
-            INSERT INTO test (data1, data2) VALUES ('retreived_val1', 'retrienved_val2')
-            "
-        ).unwrap();
-
-        let mut r = q.execute_sql(&connection).unwrap();
-        
-        while let Ok(v) = r.next() {
-            println!("{:?}", v.unwrap());
-        }
-
-        assert_eq!(true, "" == "");
     }
 }

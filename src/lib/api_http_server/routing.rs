@@ -19,7 +19,8 @@ macro_rules! routes {
 
 pub trait Route {
     // returns matching table name for route
-    fn matches_uri(&self, uri: String) -> Option<String>;
+    fn matches_uri(&self, uri: String) -> bool;
+    fn get_schema(&self) -> &TableSchema;
 }
 
 #[derive(Debug)]
@@ -38,10 +39,33 @@ impl BasicRoute {
 }
 
 impl Route for BasicRoute {
-    fn matches_uri(&self, uri: String) -> Option<String> {
-        match uri == self.route {
-            false => None,
-            true => Some(self.table_schema.name.clone())
+    fn matches_uri(&self, uri: String) -> bool {
+        uri == self.route
+    }
+    fn get_schema(&self) -> &TableSchema {
+        &self.table_schema
+    }
+}
+
+pub fn split_uri_args(uri: String) -> (String, String) {
+    // split at last ?
+    let base_uri;
+    let uri_args;
+
+    let whole_uri = uri.to_string();
+    let path = whole_uri.chars().rev().position(|x| x == '?');
+
+    match path {
+        None => {
+            base_uri = whole_uri;
+            uri_args = String::new();
+        },
+        Some(v) => {
+            let (base, args) = whole_uri.split_at(whole_uri.len()-v);
+            let stripped = base.strip_suffix('?');
+            base_uri = stripped.unwrap_or(base).to_string();
+            uri_args = args.to_string();
         }
     }
+    (base_uri, uri_args)
 }

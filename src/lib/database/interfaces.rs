@@ -1,10 +1,11 @@
 use std::collections::HashMap;
-
-use std::fs;
 use std::path::Path;
-use super::query::{Sqlite3Query, Query};
+use std::fs;
+
 use sqlite3::{open, Connection};
 use super::table_schema::TableSchema;
+use super::response::{Sqlite3ResponseBuilder, ResponseBuilder};
+use super::query::{Sqlite3Query, Query};
 
 use hyper::{Body, Request, Response};
 
@@ -27,7 +28,7 @@ pub trait DatabaseInterface {
     fn table_from_types(&self, table_name: String, types: &HashMap<String, SQLType>);
     fn delete_db(config: &Config)
         where Self: Sized;
-    async fn process_api_request(&self, request: &mut Request<Body>, table: &str) -> Response<Body>;
+    async fn process_api_request(&self, request: &mut Request<Body>, table: &TableSchema) -> Response<Body>;
 }
 
 pub struct SQLite3Interface {
@@ -90,7 +91,7 @@ impl DatabaseInterface for SQLite3Interface {
             Err(e) => log::error!("Error when deleting sqllite3 database: {}", e)
         }
     }
-    async fn process_api_request(&self, request: &mut Request<Body>, table: &str) -> Response<Body> {
+    async fn process_api_request(&self, request: &mut Request<Body>, table: &TableSchema) -> Response<Body> {
         let query = Sqlite3Query::from_request(request, table).await;
 
         if query.is_err() {
@@ -105,8 +106,15 @@ impl DatabaseInterface for SQLite3Interface {
             log::error!("Failed to execute SQL query");
             // return error response
         }
+        let mut all_data = Vec::new();
+        let mut c = cursor.unwrap();
+        while let Ok(Some(d)) = c.next() {
+            all_data.push(d.to_vec())
+        }
 
-        Response::new(Body::from("TEMP BODY"))
+        let response_json_text = Sqlite3ResponseBuilder::from_row_data(all_data);
+
+        Response::new(Body::from(response_json_text))
     }
 }
 

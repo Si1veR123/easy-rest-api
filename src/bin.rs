@@ -12,7 +12,7 @@ use lib::api_http_server::http::run_app_server;
 
 #[tokio::main]
 async fn main() {
-
+    // CLI FLAG MATCHING
     let cli_matches = command!()
         .arg(
             arg!(
@@ -29,16 +29,21 @@ async fn main() {
         .get_matches();
 
     let optional_path: Option<String> = cli_matches.get_one::<String>("config").cloned();
+
+    // Read generic settings and table schemas
     let (config, tables) = read_config(optional_path.as_deref());
 
     enable_logging(&config);
 
+    // database is deleted and recreated when connecting
     if cli_matches.get_flag("resetdb") {
         SQLite3Interface::delete_db(&config)
     }
 
     let (interface, existing) = SQLite3Interface::connect(&config);
 
+    // assumes if existing, config tables match the database tables' structure
+    // if not existing, recreate tables from config schemas
     if !existing {
         interface.create_tables_from_schemas(tables.values().into_iter().collect())
     }

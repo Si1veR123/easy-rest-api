@@ -1,4 +1,4 @@
-database="sqllite3"
+database="sqlite3"
 database_path="database.db"
 loglevel="info"
 

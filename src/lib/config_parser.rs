@@ -10,31 +10,11 @@ use toml::Value;
 
 const DEFAULT_CONFIG_PATH: &str = "server_config.toml";
 
-fn parse_line(line: String) -> Result<(String, String), u8> {
-    // Err(0) is invalid config line (could be empty)
-
-    let mut split = line.split('=');
-
-    let k = match split.nth(0) {
-        Some(val) => val.to_string(),
-        None => {return Err(0)}
-    };
-
-    let val_unclipped = match split.nth(0) {
-        Some(val) => val.to_string(),
-        None => {return Err(0)}
-    };
-
-    // TODO: check if \n or \r exists
-    // strip \n and \r
-    let v = val_unclipped[0..val_unclipped.len()-2].to_string();
-
-    Ok((k, v))
-}
-
 pub fn read_config(optional_path: Option<&str>) -> (HashMap<String, String>, HashMap<String, TableSchema>) {
+    // will panic with error message if config file can't be read, as this is unrecoverable
     // return general config HashMap<String, String>
-    // and Vec of (route string, table schema)
+    // and HashMap {route string: table_schema}
+
     let config_path = Path::new(
         match optional_path {
             Some(p) => p,

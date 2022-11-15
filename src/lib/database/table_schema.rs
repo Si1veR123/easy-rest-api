@@ -29,4 +29,8 @@ impl TableSchema {
         statement.push_str(");");
         statement
     }
+
+    pub fn field_exists(&self, field_name: &str) -> bool {
+        self.fields.contains_key(field_name)
+    }
 }
