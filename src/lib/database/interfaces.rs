@@ -1,10 +1,16 @@
 use std::collections::HashMap;
 
 use std::fs;
+use std::path::Path;
 use super::query::{Sqlite3Query, Query};
 use sqlite3::{open, Connection};
+use super::table_schema::TableSchema;
 
-#[derive(Clone)]
+use hyper::{Body, Request, Response};
+
+type Config = HashMap<String, String>;
+
+#[derive(Clone, Debug)]
 pub enum SQLType {
     Null,
     Integer,
@@ -12,20 +18,16 @@ pub enum SQLType {
     Text,
 }
 
-
-use hyper::{Body, Request, Response};
-
-type Config = HashMap<String, String>;
-
 #[async_trait::async_trait]
 pub trait DatabaseInterface {
-    fn connect(config: &Config) -> Self
+    // (connection, existing?)
+    fn connect(config: &Config) -> (Self, bool)
         where Self: Sized;
-    fn table_from_types(&self, table_name: String, types: Vec<(String, SQLType)>);
+    fn create_tables_from_schemas(&self, schemas: Vec<&TableSchema>);
+    fn table_from_types(&self, table_name: String, types: &HashMap<String, SQLType>);
     fn delete_db(config: &Config)
         where Self: Sized;
-    fn execute_raw_query(&self, query: String);
-    async fn process_api_request(&self, request: Request<Body>, table: &str) -> Response<Body>;
+    async fn process_api_request(&self, request: &mut Request<Body>, table: &str) -> Response<Body>;
 }
 
 pub struct SQLite3Interface {
@@ -34,16 +36,29 @@ pub struct SQLite3Interface {
 
 #[async_trait::async_trait]
 impl DatabaseInterface for SQLite3Interface {
-    fn connect(config: &Config) -> Self {
+    fn connect(config: &Config) -> (Self, bool) {
         let db_path = config.get("database_path").expect("Can't find 'database_path' config");
+
+        let existing = Path::new(db_path).exists();
+
         let connection = open(db_path).expect(&format!("Can't open sqllite3 database at {}", db_path));
         
         log::info!("Connected to database at {}", db_path);
-        Self {
-            connection
+        (
+            Self {
+                connection
+            }
+            , existing
+        )
+    }
+
+    fn create_tables_from_schemas(&self, schemas: Vec<&TableSchema>) {
+        for schema in schemas {
+            self.table_from_types(schema.name.clone(), &schema.fields)
         }
     }
-    fn table_from_types(&self, table_name: String, types: Vec<(String, SQLType)>) {
+
+    fn table_from_types(&self, table_name: String, types: &HashMap<String, SQLType>) {
         let mut sql = format!("CREATE TABLE IF NOT EXISTS {} (", table_name);
 
         for (col_name, data_type) in types {
@@ -62,7 +77,7 @@ impl DatabaseInterface for SQLite3Interface {
         sql.remove(sql.len()-1);
         sql.push_str(");");
 
-        log::info!("Creating table with SQL {}", sql);
+        log::info!("Creating table with SQL: {}", sql);
 
         self.connection.execute(sql).expect("Can't create table");
     }
@@ -75,24 +90,23 @@ impl DatabaseInterface for SQLite3Interface {
             Err(e) => log::error!("Error when deleting sqllite3 database: {}", e)
         }
     }
-    fn execute_raw_query(&self, _query: String) {
-        
-    }
-    async fn process_api_request(&self, request: Request<Body>, table: &str) -> Response<Body> {
-        let query = Sqlite3Query::from_request(&request, table).await;
+    async fn process_api_request(&self, request: &mut Request<Body>, table: &str) -> Response<Body> {
+        let query = Sqlite3Query::from_request(request, table).await;
 
         if query.is_err() {
             log::error!("Failed to construct SQL query from request");
             // return error response
         }
 
-        let cursor = query.unwrap().execute_sql(&self.connection);
+        let query = query.unwrap();
+        let cursor = query.execute_sql(&self.connection);
+
         if cursor.is_err() {
             log::error!("Failed to execute SQL query");
             // return error response
         }
 
-
+        Response::new(Body::from("TEMP BODY"))
     }
 }
 

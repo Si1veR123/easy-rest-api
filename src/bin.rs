@@ -3,17 +3,16 @@ use clap::{arg, command, value_parser, Arg, ArgAction};
 use std::net::SocketAddr;
 
 use rest_api as lib;
-use lib::api_http_server::routing::BasicRoute;
 use lib::enable_logging;
 use lib::config_parser::read_config;
 use lib::database::interfaces::{SQLite3Interface, DatabaseInterface};
 use lib::app::App;
-use lib::routes;
-use lib::api_http_server::routing::Route;
+use lib::api_http_server::routing::{BasicRoute, Route};
 use lib::api_http_server::http::run_app_server;
 
 #[tokio::main]
 async fn main() {
+
     let cli_matches = command!()
         .arg(
             arg!(
@@ -30,7 +29,7 @@ async fn main() {
         .get_matches();
 
     let optional_path: Option<String> = cli_matches.get_one::<String>("config").cloned();
-    let config = read_config(optional_path.as_deref());
+    let (config, tables) = read_config(optional_path.as_deref());
 
     enable_logging(&config);
 
@@ -38,12 +37,19 @@ async fn main() {
         SQLite3Interface::delete_db(&config)
     }
 
-    let interface = SQLite3Interface::connect(&config);
+    let (interface, existing) = SQLite3Interface::connect(&config);
 
-    let routes = routes!(
-        ("/people", "people sql table"),
-        ("/jobs", "jobs sql table")
-    );
+    if !existing {
+        interface.create_tables_from_schemas(tables.values().into_iter().collect())
+    }
+
+    // construct route to table schema mappings
+    let mut routes = Vec::new();
+    for table in tables {
+        routes.push(Box::new(
+            BasicRoute {route: table.0, table_schema: table.1}
+        ) as Box<dyn Route + Send + Sync>)
+    }
 
     let app = App {
         routes,

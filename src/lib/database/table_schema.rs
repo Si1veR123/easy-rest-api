@@ -2,14 +2,15 @@ use std::collections::HashMap;
 
 use super::interfaces::SQLType;
 
-pub struct Table {
-    name: String,
+#[derive(Debug)]
+pub struct TableSchema {
+    pub name: String,
 
     // col name: data type
-    fields: HashMap<String, SQLType>
+    pub fields: HashMap<String, SQLType>
 }
 
-impl Table {
+impl TableSchema {
     pub fn generate_create_sql(&self) -> String {
         let mut statement = format!("CREATE TABLE IF NOT EXISTS {} (", self.name);
 

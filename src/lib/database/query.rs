@@ -24,7 +24,7 @@ pub enum HttpMethod {
 #[async_trait::async_trait]
 pub trait Query<'a, T, A> {
     // TODO: restructure to return errors with strings and log in caller function
-    async fn from_request(request: &Request<Body>, table: &str) -> Result<Self, ()>
+    async fn from_request(request: &mut Request<Body>, table: &str) -> Result<Self, ()>
         where Self: Sized;
     fn execute_sql(&'a self, connection: T) -> A;
 }
@@ -38,7 +38,7 @@ pub struct Sqlite3Query {
 
 #[async_trait::async_trait]
 impl<'a> Query<'a, &'a Connection, SqlResult<Cursor<'a>>> for Sqlite3Query {
-    async fn from_request(request: &Request<Body>, table: &str) -> Result<Self, ()> {
+    async fn from_request(request: &mut Request<Body>, table: &str) -> Result<Self, ()> {
         let method = match request.method().clone() {
             hyper::Method::GET => HttpMethod::GET,
             hyper::Method::PATCH => HttpMethod::PATCH,
@@ -72,7 +72,7 @@ impl<'a> Query<'a, &'a Connection, SqlResult<Cursor<'a>>> for Sqlite3Query {
             return Err(())
         }
         
-        let content = parsed.unwrap();
+        let mut content = parsed.unwrap();
         let columns = content.remove("columns");
         if !columns.is_object() {
             log::error!("Error getting 'columns' from json (not present or wrong type)");

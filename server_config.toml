@@ -1,0 +1,13 @@
+database="sqllite3"
+database_path="database.db"
+loglevel="info"
+
+[table.people]
+route = "/people"
+name = "text"
+age = "Integer"
+
+[table.companies]
+route = "/companies"
+name = "text"
+revenue = "Real"

@@ -52,7 +52,7 @@ impl App {
                 response.unwrap()
             },
             Some(table_name) => {
-                self.database_interface.process_api_request(req, &table_name).await
+                self.database_interface.process_api_request(&mut req, &table_name).await
             }
         };
         Ok(response)

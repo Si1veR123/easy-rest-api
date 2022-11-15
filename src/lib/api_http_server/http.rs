@@ -7,8 +7,6 @@ use hyper::service::{make_service_fn, service_fn};
 
 use super::super::app::App;
 
-use log::error;
-
 async fn handle(
     context: Arc<App>,
     addr: SocketAddr,
@@ -37,6 +35,6 @@ pub async fn run_app_server(addr: SocketAddr, app: App) {
     let server = Server::bind(&addr).serve(make_service);
 
     if let Err(e) = server.await {
-        error!("server error: {}", e);
+        log::error!("server error: {}", e);
     }
 }
