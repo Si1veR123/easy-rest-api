@@ -3,14 +3,14 @@ use std::fs::File;
 use std::io::Read;
 use std::path::Path;
 
-use super::database::table_schema::TableSchema;
+use super::database::table_schema::SqlTableSchema;
 use super::database::interfaces::SQLType;
 
 use toml::Value;
 
 const DEFAULT_CONFIG_PATH: &str = "server_config.toml";
 
-pub fn read_config(optional_path: Option<&str>) -> (HashMap<String, String>, HashMap<String, TableSchema>) {
+pub fn read_config(optional_path: Option<&str>) -> (HashMap<String, String>, HashMap<String, SqlTableSchema>) {
     // will panic with error message if config file can't be read, as this is unrecoverable
     // return general config HashMap<String, String>
     // and HashMap {route string: table_schema}
@@ -74,10 +74,10 @@ pub fn read_config(optional_path: Option<&str>) -> (HashMap<String, String>, Has
             if field_sql_type.is_none() {
                 panic!("Invalid SQL type found in table field: {}", sql_type_string);
             }
-            table_schema_mapping.insert(field.0.clone(), field_sql_type.unwrap());
+            table_schema_mapping.insert(field.0.to_ascii_lowercase().clone(), field_sql_type.unwrap());
         }
 
-        table_routes.insert(route.to_string(), TableSchema {name: table_name.clone(), fields: table_schema_mapping});
+        table_routes.insert(route.to_string(), SqlTableSchema {name: table_name.clone(), fields: table_schema_mapping});
     }
 
     (general_config, table_routes)

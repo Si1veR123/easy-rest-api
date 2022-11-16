@@ -1,4 +1,4 @@
-use sqlite3::Value;
+use sqlite3::Value as SqlValue;
 
 use json::JsonValue;
 
@@ -7,8 +7,8 @@ pub trait ResponseBuilder<T> {
 }
 
 pub struct Sqlite3ResponseBuilder;
-impl ResponseBuilder<Value> for Sqlite3ResponseBuilder {
-    fn from_row_data(row_data: Vec<Vec<Value>>) -> String {
+impl ResponseBuilder<SqlValue> for Sqlite3ResponseBuilder {
+    fn from_row_data(row_data: Vec<Vec<SqlValue>>) -> String {
         let mut root = JsonValue::Array(vec![]);
         
         for row in row_data {
@@ -16,10 +16,10 @@ impl ResponseBuilder<Value> for Sqlite3ResponseBuilder {
 
             for val in row {
                 let json_value = match val {
-                    Value::Float(f) => JsonValue::Number(json::number::Number::from(f)),
-                    Value::Integer(i) => JsonValue::Number(json::number::Number::from(i)),
-                    Value::String(s) => JsonValue::String(s),
-                    Value::Null => JsonValue::Null,
+                    SqlValue::Float(f) => JsonValue::Number(json::number::Number::from(f)),
+                    SqlValue::Integer(i) => JsonValue::Number(json::number::Number::from(i)),
+                    SqlValue::String(s) => JsonValue::String(s),
+                    SqlValue::Null => JsonValue::Null,
                     t => {
                         log::debug!("Invalid SQLite3 type: {:?}", t);
                         continue

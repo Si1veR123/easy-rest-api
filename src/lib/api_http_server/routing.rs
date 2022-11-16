@@ -1,4 +1,4 @@
-use super::super::database::table_schema::TableSchema;
+use super::super::database::table_schema::SqlTableSchema;
 
 
 /// Example
@@ -20,17 +20,17 @@ macro_rules! routes {
 pub trait Route {
     // returns matching table name for route
     fn matches_uri(&self, uri: String) -> bool;
-    fn get_schema(&self) -> &TableSchema;
+    fn get_schema(&self) -> &SqlTableSchema;
 }
 
 #[derive(Debug)]
 pub struct BasicRoute {
     pub route: String,
-    pub table_schema: TableSchema,
+    pub table_schema: SqlTableSchema,
 }
 
 impl BasicRoute {
-    pub fn new(route: String, table_schema: TableSchema) -> Self {
+    pub fn new(route: String, table_schema: SqlTableSchema) -> Self {
         Self {
             route,
             table_schema
@@ -42,7 +42,7 @@ impl Route for BasicRoute {
     fn matches_uri(&self, uri: String) -> bool {
         uri == self.route
     }
-    fn get_schema(&self) -> &TableSchema {
+    fn get_schema(&self) -> &SqlTableSchema {
         &self.table_schema
     }
 }

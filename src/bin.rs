@@ -16,14 +16,14 @@ async fn main() {
     let cli_matches = command!()
         .arg(
             arg!(
-                -c --config <FILE> "Sets a custom config file"
+                -c --config <FILE> "Sets the path to a custom config file"
            )
            .value_parser(value_parser!(String))
         )
         .arg(
             Arg::new("resetdb")
                 .short('r')
-                .long("reset database")
+                .long("resetdb")
                 .action(ArgAction::SetTrue)
         )
         .get_matches();

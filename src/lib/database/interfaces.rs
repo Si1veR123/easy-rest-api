@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::path::Path;
 use std::fs;
 
-use super::table_schema::TableSchema;
+use super::table_schema::SqlTableSchema;
 use super::response::{Sqlite3ResponseBuilder, ResponseBuilder};
 use super::query::{Sqlite3Query, Query};
 
@@ -25,11 +25,10 @@ pub trait DatabaseInterface {
     // (connection, existing?)
     fn connect(config: &Config) -> (Self, bool)
         where Self: Sized;
-    fn create_tables_from_schemas(&self, schemas: Vec<&TableSchema>);
-    fn table_from_types(&self, table_name: String, types: &HashMap<String, SQLType>);
     fn delete_db(config: &Config)
         where Self: Sized;
-    async fn process_api_request(&self, request: &mut Request<Body>, table: &TableSchema) -> Response<Body>;
+    fn table_from_types(&self, table_name: String, types: &HashMap<String, SQLType>);
+    async fn process_api_request(&self, request: &mut Request<Body>, table: &SqlTableSchema) -> Response<Body>;
 }
 
 pub struct SQLite3Interface {
@@ -54,14 +53,8 @@ impl DatabaseInterface for SQLite3Interface {
         )
     }
 
-    fn create_tables_from_schemas(&self, schemas: Vec<&TableSchema>) {
-        for schema in schemas {
-            self.table_from_types(schema.name.clone(), &schema.fields)
-        }
-    }
-
     fn table_from_types(&self, table_name: String, types: &HashMap<String, SQLType>) {
-        let mut sql = format!("CREATE TABLE IF NOT EXISTS {} (", table_name);
+        let mut sql = format!("CREATE TABLE IF NOT EXISTS {} (ID INTEGER PRIMARY KEY,", table_name);
 
         for (col_name, data_type) in types {
             sql.push_str(&col_name);
@@ -94,7 +87,7 @@ impl DatabaseInterface for SQLite3Interface {
         }
     }
 
-    async fn process_api_request(&self, request: &mut Request<Body>, table: &TableSchema) -> Response<Body> {
+    async fn process_api_request(&self, request: &mut Request<Body>, table: &SqlTableSchema) -> Response<Body> {
         // GENERATE QUERY
         let query = Sqlite3Query::from_request(request, table).await;
 

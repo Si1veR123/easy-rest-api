@@ -2,7 +2,7 @@
 use std::convert::Infallible;
 use std::net::SocketAddr;
 
-use super::database::table_schema::TableSchema;
+use super::database::table_schema::SqlTableSchema;
 
 use super::api_http_server::routing::{Route, split_uri_args};
 use super::api_http_server::middleware::Middleware;
@@ -18,7 +18,7 @@ pub struct App {
 }
 
 impl App {
-    fn match_route(&self, uri: String) -> Option<&TableSchema> {
+    fn match_route(&self, uri: String) -> Option<&SqlTableSchema> {
         for route in &self.routes {
             let route_match = route.matches_uri(uri.clone());
             if route_match {
