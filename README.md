@@ -1,30 +1,29 @@
 # **No-code REST API server**
 
 ## Table of Contents
-  + [<u>**Using the binary**</u>](#-u---using-the-binary----u-)
-    + [**Config file**](#--config-file--)
-        + [**Specifying database tables**](#--specifying-database-tables--)
-    + [**Command Line Options**](#--command-line-options--)
-    + [**API Format**](#--api-format--)
-      + [**GET Requests**](#--get-requests--)
-      + [**POST Requests**](#--post-requests--)
-      + [**DELETE Requests**](#--delete-requests--)
-      + [**PATCH Requests**](#--patch-requests--)
-  + [<u>**Using the library**</u>](#-u---using-the-library----u-)
-    + [**Miscellaneous**](#--miscellaneous--)
-    + [**Flow of received HTTP requests in the app**](#--flow-of-received-http-requests-in-the-app---)
-    + [**Adding middleware**](#--adding-middleware--)
-    + [**Adding a new database implementation**](#--adding-a-new-database-implementation--)
-      + [**Interface : *Required***](#--interface----required---)
-      + [**Query**](#--query--)
-      + [**ResponseBuilder**](#--responsebuilder--)
+  + [<u>**Using the binary**</u>](#using-the-binary)
+    + [**Config file**](#config-file)
+        + [Specifying database tables](#specifying-database-tables)
+    + [**Command Line Options**](#command-line-options)
+    + [**API Format**](#api-format)
+      + [GET Requests](#get-requests)
+      + [POST Requests](#post-requests)
+      + [DELETE Requests](#delete-requests)
+      + [PATCH Requests](#patch-requests)
+  + [<u>**Using the library**</u>](#using-the-library)
+    + [**Miscellaneous**](#miscellaneous)
+    + [**Flow of received HTTP requests in the app**](#flow-of-received-http-requests-in-the-app)
+    + [**Adding middleware**](#adding-middleware)
+    + [**Adding a new database implementation**](#adding-a-new-database-implementation)
+      + [Interface : *Required*](#interface--required)
+      + [Query](#query)
+      + [ResponseBuilder](#responsebuilder)
 
 <br/>
 
-## <u>**Using the binary**</u>
+# **Using the binary**
 An API can be setup using the server_config.toml
 
------
 ## **Config file**
 The config file uses the [TOML](https://toml.io/en/) format.  
 A typical config file looks like:
@@ -72,7 +71,6 @@ The remaining attributes specify the structure of the table.
 
 ***A primary key `id` is automatically added for every table.***
 
------
 ## **Command Line Options**
 `-c --config <FILE>`  
 Sets the path to a custom config file
@@ -80,7 +78,6 @@ Sets the path to a custom config file
 `-r --resetdb`  
 Reset the database before starting server
 
------
 ## **API Format**
 The API uses [JSON](https://www.json.org/json-en.html) format to receive and send data.
 
@@ -169,12 +166,12 @@ Empty body.
 If an error is encountered when updating, HTTP error code 500 will be returned. It cannot be assumed any values were updated successfully.
 Else, HTTP 200.
 
------
-## <u>**Using the library**</u>
+<br>
+
+# **Using the library**
 ## A basic implementation (used for the binary) can be found [here](/src/bin.rs).
 
------
-### **Miscellaneous**
+## **Miscellaneous**
 
 **The config TOML file is parsed with:**  
 ```
@@ -194,12 +191,10 @@ rest_api::api_http_server::http::run_app_server(addr, app).await
 ```
 *This requires the parent function to be async*
 
------
-### **Flow of received HTTP requests in the app**:
+## **Flow of received HTTP requests in the app**:
 ![Flow overview](overview.png)
 
------
-### **Adding middleware**
+## **Adding middleware**
 The easiest way to add functionality is to create your own [`App`](/src/lib/app.rs) with your own [`middleware`](/src/lib/api_http_server/middleware.rs).  
 This allows every request and response to be intercepted and processed.  
 To create a middleware, create a struct that implements the Middleware trait, as well as Sync and Send for thread safety.  
@@ -217,7 +212,6 @@ let app = App {
 
 ```
 
------
 ### **Adding a new database implementation**
 To support a new database type, the following things must be implemented:
 
