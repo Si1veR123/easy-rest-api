@@ -104,11 +104,13 @@ impl<'a> Query<'a, &'a Connection, SqlResult<Cursor<'a>>> for Sqlite3Query {
             return Err(QueryErr("Error creating string from request body bytes".to_string(), true))
         }
 
+        let body = body.unwrap();
         let parsed = parse(
-            &body.unwrap()
+            &body
         );
         if parsed.is_err() {
-            return Err(QueryErr("Error parsing json body".to_string(), false))
+            let error = parsed.err().unwrap();
+            return Err(QueryErr(format!("Error parsing json ( {} ): {}", body, error), false))
         }
         
         let mut content = parsed.unwrap();

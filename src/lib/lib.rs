@@ -3,23 +3,32 @@ pub mod database;
 pub mod api_http_server;
 pub mod app;
 
+use std::io::Write;
+use chrono::Local;
+use env_logger::Builder;
+
 use std::collections::HashMap;
 
-use log::{warn};
-
 pub fn enable_logging(config: &HashMap<String, String>) {
-    let init = match config.get("loglevel") {
+    // panic if called more than once
+
+    let _init = match config.get("loglevel") {
         Some(val) => {
-            let env = env_logger::Env::new();
-            let env = env.default_filter_or(val);
-            env_logger::try_init_from_env(env)
+
+            Builder::new()
+                .format(|buf, record| {
+                    writeln!(buf,
+                        "{} [{}] - {}",
+                        Local::now().format("%Y-%m-%dT%H:%M:%S"),
+                        record.level(),
+                        record.args()
+                    )
+                })
+                .parse_filters(val)
+                .init()
         }
         None => {
-            env_logger::try_init()
+            let _ = env_logger::try_init();
         }
     };
-    match init {
-        Ok(_) => (),
-        Err(e) => warn!("{}", e)
-    }
 }

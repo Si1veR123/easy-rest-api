@@ -4,7 +4,7 @@ use std::fs;
 
 use super::table_schema::TableSchema;
 use super::response::{Sqlite3ResponseBuilder, ResponseBuilder};
-use super::query::{Sqlite3Query, Query, QueryErr};
+use super::query::{Sqlite3Query, Query};
 
 use sqlite3::{open, Connection};
 use hyper::{Body, Request, Response};
@@ -111,7 +111,7 @@ impl DatabaseInterface for SQLite3Interface {
                 log::debug!("{}", error.0);
                 return Response::builder()
                     .status(400)
-                    .body(Body::from("Client Error Encountered"))
+                    .body(Body::from("Client Error"))
                     .unwrap();
             }
         }

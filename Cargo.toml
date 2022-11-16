@@ -17,6 +17,7 @@ tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 json = "0.12.4"
 toml = "0.5.9"
 async-trait = "0.1.58"
+chrono = "0.4.23"
 
 [features]
 build-binary = ["clap"]
