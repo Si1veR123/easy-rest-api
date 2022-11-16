@@ -1,7 +1,6 @@
-<div style="display: flex; align-items: center; justify-content: center;">
-<img src="https://www.rust-lang.org/logos/rust-logo-blk.svg" style="background-color: orange; border-radius: 20px;" alt="Rust Logo" width="100">
-</div>
-
+<p align="center">
+    <img src="images/rust-logo.png" alt="Rust Logo" width="130">
+</p>
 <br>
 
 # **No-code REST API server**
