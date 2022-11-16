@@ -1,3 +1,9 @@
+<div style="display: flex; align-items: center; justify-content: center;">
+<img src="https://www.rust-lang.org/logos/rust-logo-blk.svg" style="background-color: orange; border-radius: 20px;" alt="Rust Logo" width="100">
+</div>
+
+<br>
+
 # **No-code REST API server**
 
 ## Table of Contents
