@@ -21,7 +21,7 @@
     + [**Adding a new database implementation**](#adding-a-new-database-implementation)
       + [Interface : *Required*](#interface--required)
       + [Query](#query)
-      + [ResponseBuilder](#responsebuilder)
+      + [ResponseBuilder](#response-builder)
 
 <br/>
 
@@ -99,13 +99,13 @@ Each result is an ordered array containing each field. The first field is the un
 **Examples:**
 ```
 curl 127.0.0.1:3000/people
-    => [[1,"john",5],[2,"jess",19],[3,"mike",56]]
+    => [[1,"john",5],[2,"jess",19],[3,"mike",56],[4,"andrew",56]]
 
 curl 127.0.0.1:3000/people?id=2
-    => [[2,"john",8]]
+    => [[2,"jess",19]]
 
-curl 127.0.0.1:3000/people?age=43
-    => [[4,"john",43],[13,"andrew",43]]
+curl 127.0.0.1:3000/people?age=56
+    => [[3,"mike",56],[4,"andrew",56]]
 ```
 
 ### **POST Requests**
@@ -196,7 +196,7 @@ rest_api::api_http_server::http::run_app_server(addr, app).await
 *This requires the parent function to be async*
 
 ## **Flow of received HTTP requests in the app**:
-![Flow overview](overview.png)
+![Flow overview](/images/overview.png)
 
 ## **Adding middleware**
 The easiest way to add functionality is to create your own [`App`](/src/lib/app.rs) with your own [`middleware`](/src/lib/api_http_server/middleware.rs).  
@@ -236,11 +236,11 @@ pub enum SQLType {
 ```
 
 #### **Query**
-The [query](/src/lib/database/query.rs) is an optional trait that can help with converting requests to SQL. It is used in the SQLite3 implementation for parsing request data and safely executing SQL.  
+The [query](/src/lib/database/query.rs) is an optional trait that can help with converting requests to SQL. It is used in the SQLite3 interface implementation for parsing request data and safely executing SQL.  
 It has 2 generics `<T, A>`.  
-`T` is a database connection.  
-`A` is a cursor returned from executing a statement.
+`T` is a database connection type.  
+`A` is a cursor type, returned from executing a statement.
 
-#### **ResponseBuilder**
+#### **Response Builder**
 The [response builder](/src/lib/database/response.rs) is an optional trait that defines a function to convert a query result `Vec<Vec<T>>` (where `T` is a database value) into a string for a response.  
 The outer `Vec` contains the rows, and the inner `Vec` contains the fields in a row.

@@ -27,6 +27,13 @@ pub trait DatabaseInterface {
         where Self: Sized;
     fn delete_db(config: &Config)
         where Self: Sized;
+
+    fn create_tables_from_schemas(&self, schemas: Vec<&SqlTableSchema>) {
+        for schema in schemas {
+            self.table_from_types(schema.name.clone(), &schema.fields)
+        }
+    }
+
     fn table_from_types(&self, table_name: String, types: &HashMap<String, SQLType>);
     async fn process_api_request(&self, request: &mut Request<Body>, table: &SqlTableSchema) -> Response<Body>;
 }

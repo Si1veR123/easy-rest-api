@@ -68,8 +68,8 @@ impl<'a> Query<'a, &'a Connection, SqlResult<Cursor<'a>>> for Sqlite3Query<'a> {
             return Err(QueryErr("Invalid Method".to_string(), false))
         }
 
-        if method == HttpMethod::GET {
-            // GET is constructed from uri args
+        if method == HttpMethod::GET || method == HttpMethod::DELETE {
+            // GET and DELETE are constructed from uri args
 
             let (_, uri_args) = split_uri_args(request.uri().to_string());
 
@@ -179,12 +179,15 @@ impl<'a> Query<'a, &'a Connection, SqlResult<Cursor<'a>>> for Sqlite3Query<'a> {
     }
 }
 
+
+
+
 impl<'a> Sqlite3Query<'a> {
     fn construct_get_sql(&'a self, connection: &'a Connection) -> SqlResult<Cursor> {
         let mut bindings: Vec<SqlValue> = Vec::new();
         let mut select_builder = "SELECT *".to_string();
 
-        select_builder.push_str(&format!(" FROM {}", self.table_schema.name.clone()));
+        select_builder.push_str(&format!(" FROM {}", self.table_schema.name));
 
         if self.filter.len() > 0 {
             select_builder.push_str(" WHERE ");
@@ -278,7 +281,39 @@ impl<'a> Sqlite3Query<'a> {
     }
     
     fn construct_delete_sql(&'a self, connection: &'a Connection) -> SqlResult<Cursor> {
-        Ok(connection.prepare("INVALID TEST STATEMENT").unwrap().cursor())
+        let mut bindings: Vec<SqlValue> = Vec::new();
+        let mut delete_builder = format!("DELETE FROM {}", self.table_schema.name);
+
+        if self.filter.len() > 0 {
+            delete_builder.push_str(" WHERE ");
+
+            for filter in &self.filter {
+                // fields MUST be checked to be valid for the table when constructing query object
+                // or vulnerable to SQL injection
+                delete_builder.push_str( &format!("{}=? AND ", filter.0) );
+
+                bindings.push(SqlValue::String(filter.1.clone()));
+            }
+
+            // remove last AND
+            delete_builder.remove(delete_builder.len()-1);
+            delete_builder.remove(delete_builder.len()-1);
+            delete_builder.remove(delete_builder.len()-1);
+            delete_builder.remove(delete_builder.len()-1);
+            delete_builder.remove(delete_builder.len()-1);
+        }
+
+        let statement = connection.prepare(delete_builder);
+        
+        if statement.is_err() {
+            let error = statement.err().unwrap();
+            return Err(error)
+        }
+
+        let mut bound = statement.unwrap().cursor();
+        let _res = bound.bind(bindings.as_slice());
+
+        Ok(bound)
     }
 
     fn construct_patch_sql(&'a self, connection: &'a Connection) -> SqlResult<Cursor> {
