@@ -1,7 +1,6 @@
 <p align="center">
     <img src="images/rust-logo.png" alt="Rust Logo" width="130">
 </p>
-<br>
 
 # **No-code REST API server**
 
@@ -32,7 +31,7 @@ An API can be setup using the server_config.toml
 ## **Config file**
 The config file uses the [TOML](https://toml.io/en/) format.  
 A typical config file looks like:
-```
+```toml
 database="sqlite3"
 database_path="database.db"
 loglevel="debug"
@@ -113,7 +112,7 @@ curl 127.0.0.1:3000/people?age=43
 Used to add new database entries.
 #### **Sending**
 A POST request must contain a JSON body. The format of the body is
-```
+```json
 {
     "columns": {
         "name": "john",
@@ -152,7 +151,7 @@ Else, HTTP 200.
 Used to update database entries.
 #### **Sending**
 A PATCH request must contain a JSON body. The format of the body is
-```
+```json
 {
     "columns": {
         "name": "jeff",
@@ -179,19 +178,19 @@ Else, HTTP 200.
 ## **Miscellaneous**
 
 **The config TOML file is parsed with:**  
-```
+```rust
 let (config, tables) = rest_api::config_parser::read_config(optional_path)
 ```
 
 **Logging is enabled by calling:**  
-```
+```rust
 rest_api::enable_logging(&config)
 ```
 *Call once only*  
 
 
 **An app is asynchronously run with:**
-```
+```rust
 rest_api::api_http_server::http::run_app_server(addr, app).await
 ```
 *This requires the parent function to be async*
@@ -205,7 +204,7 @@ This allows every request and response to be intercepted and processed.
 To create a middleware, create a struct that implements the Middleware trait, as well as Sync and Send for thread safety.  
 Middlewares are registered when creating the `App` object. For reference, [bin.rs](/src/bin.rs) shows how an app is created.  
 Example:
-```
+```rust
 // create_auth_middleware() must return a struct that implements the Middleware + Send + Sync traits.
 let auth_middleware = Box::new( create_auth_middleware() ) as Box<dyn Middleware + Send + Sync>;
 
@@ -227,7 +226,7 @@ An interface struct implements the DatabaseInterface trait.
 Due to the `async` requirement for processing the request, the implementation of the trait must use `#[async_trait::async_trait]`, from the [async_trait](https://docs.rs/async-trait/latest/async_trait/) crate.  
 
 The supported data types are in the `SQLType` enum:
-```
+```rust
 pub enum SQLType {
     Null,
     Integer,
