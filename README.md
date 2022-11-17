@@ -3,7 +3,9 @@
 </p>
 
 <p align="center">
-    <a href="https://crates.io/crates/easy-rest-api" style="font-size:30px">Crates.io</a>
+    <a href="https://crates.io/crates/easy-rest-api" style="font-size:30px">crates.io</a>
+    <br>
+    <img src="https://img.shields.io/crates/d/easy-rest-api?label=Crate%20downloads&color=orange&style=for-the-badge">
     <br>
     <code>easy-rest-api = "*"</code>
 </p>
