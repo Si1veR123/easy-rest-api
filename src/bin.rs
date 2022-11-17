@@ -1,7 +1,5 @@
 use clap::{arg, command, value_parser, Arg, ArgAction};
 
-use std::net::SocketAddr;
-
 use rest_api as lib;
 use lib::enable_logging;
 use lib::config_parser::read_config;
@@ -62,5 +60,5 @@ async fn main() {
         database_interface: Box::new(interface)
     };
 
-    run_app_server(SocketAddr::from(([127, 0, 0, 1], 3000)), app).await;
+    run_app_server(config.get("host").expect("No host in config").parse().expect("Can't parse IP"), app).await;
 }

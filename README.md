@@ -44,6 +44,7 @@ A typical config file looks like:
 database="sqlite3"
 database_path="database.db"
 loglevel="debug"
+host="127.0.0.1:3000"
 
 # Example table
 [table.people]
@@ -65,6 +66,9 @@ This can be a value of:
 - `debug`
 - `trace`
 - `off`
+
+```host```  
+Specifies the IP and port that the server is run on in the format `ip:port`
 
 ### **Specifying database tables**
 ```[table.name]```  

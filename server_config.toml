@@ -1,6 +1,7 @@
 database="sqlite3"
 database_path="database.db"
 loglevel="debug"
+host="127.0.0.1:3000"
 
 [table.people]
 route = "/people"
