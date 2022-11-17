@@ -309,7 +309,6 @@ impl<'a> Sqlite3Query<'a> {
             delete_builder.remove(delete_builder.len()-1);
             delete_builder.remove(delete_builder.len()-1);
         }
-        println!("{}", delete_builder);
         let statement = connection.prepare(delete_builder);
         
         if statement.is_err() {

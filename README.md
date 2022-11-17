@@ -28,6 +28,15 @@
 # **Using the binary**
 An API can be setup using the server_config.toml
 
+## **Building the binary**
+### **Prerequisites**
+- cargo (rust package manager)
+
+This command will build the binary:
+```
+cargo build --release --bin="rust_rest_api" --features="build-binary"
+```
+
 ## **Config file**
 The config file uses the [TOML](https://toml.io/en/) format.  
 A typical config file looks like:
@@ -202,7 +211,7 @@ rest_api::api_http_server::http::run_app_server(addr, app).await
 The easiest way to add functionality is to create your own [`App`](/src/lib/app.rs) with your own [`middleware`](/src/lib/api_http_server/middleware.rs).  
 This allows every request and response to be intercepted and processed.  
 To create a middleware, create a struct that implements the Middleware trait, as well as Sync and Send for thread safety.  
-Middlewares are registered when creating the `App` object. For reference, [bin.rs](/src/bin.rs) shows how an app is created.  
+Middlewares are registered when creating the `App` object. For reference, [bin.rs](/src/bin.rs#L59) shows how an app is created.  
 Example:
 ```rust
 // create_auth_middleware() must return a struct that implements the Middleware + Send + Sync traits.
