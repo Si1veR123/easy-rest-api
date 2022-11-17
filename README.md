@@ -2,6 +2,12 @@
     <img src="images/rust-logo.png" alt="Rust Logo" width="130">
 </p>
 
+<p align="center">
+    <a href="https://crates.io/crates/easy-rest-api" style="font-size:30px">Crates.io</a>
+    <br>
+    <code>easy-rest-api = "*"</code>
+</p>
+
 # **No-code REST API server**
 
 ## Table of Contents
