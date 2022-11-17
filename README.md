@@ -21,7 +21,7 @@
     + [**Adding a new database implementation**](#adding-a-new-database-implementation)
       + [Interface : *Required*](#interface--required)
       + [Query](#query)
-      + [ResponseBuilder](#response-builder)
+      + [Response Builder](#response-builder)
 
 <br/>
 
@@ -137,14 +137,14 @@ curl -X POST -d @test.json 127.0.0.1:3000/people
 ### **DELETE Requests**
 Used to delete database entries.
 #### **Sending**
-Sending a delete request to a table's route will delete the table.  
+Sending a delete request to a table's route will delete the table's contents.  
 Query strings can be used to filter which entries are deleted.  
 `/people?age=4` will translate to SQL `DELETE FROM people WHERE age=4`  
 `+` in query strings are translated to a space.
 
 #### **Returning**
 Empty body.  
-If an error is encountered when deleting, HTTP error code 500 will be returned. It cannot be assumed the entry was deleted successfully.  
+If an error is encountered when deleting, HTTP error code 500/400 will be returned. It cannot be assumed the entry was deleted successfully.  
 Else, HTTP 200.
 
 ### **PATCH Requests**
@@ -167,7 +167,7 @@ This will update all columns' `name` to the value `"jeff"` for all entries that 
 
 #### **Returning**
 Empty body.  
-If an error is encountered when updating, HTTP error code 500 will be returned. It cannot be assumed any values were updated successfully.
+If an error is encountered when updating, HTTP error code 500/400 will be returned. It cannot be assumed any values were updated successfully.
 Else, HTTP 200.
 
 <br>
@@ -216,7 +216,7 @@ let app = App {
 
 ```
 
-### **Adding a new database implementation**
+## **Adding a new database implementation**
 To support a new database type, the following things must be implemented:
 
 #### **Interface : *Required***

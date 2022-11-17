@@ -84,15 +84,17 @@ impl<'a> Query<'a, &'a Connection, SqlResult<Cursor<'a>>> for Sqlite3Query<'a> {
                 }
 
                 let (left, right) = res.unwrap();
+                let left = left.to_lowercase();
+
                 let right_with_space = right.replace('+', " ");
 
-                if table.field_exists(left) {
-                    uri_args_parsed.insert(left.to_string(), right_with_space.to_string());
+                if table.field_exists(&left) {
+                    uri_args_parsed.insert(left, right_with_space.to_string());
                 }
             }
 
             return Ok(Self {
-                method: HttpMethod::GET,
+                method,
                 table_schema: &table,
                 fields_data: HashMap::new(),
                 filter: uri_args_parsed,
@@ -134,7 +136,10 @@ impl<'a> Query<'a, &'a Connection, SqlResult<Cursor<'a>>> for Sqlite3Query<'a> {
                     return Err(QueryErr("Columns json contains non-string".to_string(), false))
                 }
 
-                data_hashmap.insert(col.0.to_string(), col_as_str.unwrap().to_string());
+                // prevent sql injection by only allowing valid field names
+                if table.field_exists(&col.0.to_lowercase()) {
+                    data_hashmap.insert(col.0.to_string(), col_as_str.unwrap().to_string());
+                }
             }
         } else if !columns.is_null() {
             // null means keep empty columns hashmap, if not null, it is wrong type
@@ -151,7 +156,10 @@ impl<'a> Query<'a, &'a Connection, SqlResult<Cursor<'a>>> for Sqlite3Query<'a> {
                     return Err(QueryErr("Filters json contains non-string".to_string(), false))
                 }
 
-                filters_hashmap.insert(filter.0.to_string(), filter_val.unwrap().to_string());
+                // prevent sql injection by only allowing valid field names
+                if table.field_exists(filter.0) {
+                    filters_hashmap.insert(filter.0.to_string(), filter_val.unwrap().to_string());
+                }
             }
         } else if !filters.is_null() {
             // null means keep empty filters hashmap, if not null, it is wrong type
@@ -240,7 +248,6 @@ impl<'a> Sqlite3Query<'a> {
                 return Err(SqlError {message: Some(format!("Missing field value {}", field.0)), code: None})
             }
             let v = field_value.unwrap();
-            println!("{}", v);
             insert_builder.push_str("?,");
             bindings.push(SqlValue::String(v.clone()))
         }
@@ -302,7 +309,7 @@ impl<'a> Sqlite3Query<'a> {
             delete_builder.remove(delete_builder.len()-1);
             delete_builder.remove(delete_builder.len()-1);
         }
-
+        println!("{}", delete_builder);
         let statement = connection.prepare(delete_builder);
         
         if statement.is_err() {
@@ -317,6 +324,52 @@ impl<'a> Sqlite3Query<'a> {
     }
 
     fn construct_patch_sql(&'a self, connection: &'a Connection) -> SqlResult<Cursor> {
-        Ok(connection.prepare("INVALID TEST STATEMENT").unwrap().cursor())
+        let mut patch_builder = format!("UPDATE {} SET ", self.table_schema.name);
+
+        let mut bindings: Vec<SqlValue> = Vec::new();
+
+        if self.fields_data.len() == 0 {
+            return Err(SqlError {message: Some("No parsed data in PATCH body".to_string()), code: None})
+        }
+
+        for field in &self.table_schema.fields {
+            let field_value = self.fields_data.get(field.0);
+            if field_value.is_none() {
+                continue
+            }
+
+            let v = field_value.unwrap();
+            patch_builder.push_str(&format!("{}=?,", field.0));
+            bindings.push(SqlValue::String(v.clone()))
+        }
+
+        patch_builder.remove(patch_builder.len()-1);
+
+        if self.filter.len() > 0 {
+            patch_builder.push_str(" WHERE");
+
+            for filter in &self.filter {
+                patch_builder.push_str(&format!(" {}=? AND", filter.0));
+                bindings.push(SqlValue::String(filter.1.clone()));
+            }
+
+            patch_builder.remove(patch_builder.len()-1);
+            patch_builder.remove(patch_builder.len()-1);
+            patch_builder.remove(patch_builder.len()-1);
+            patch_builder.remove(patch_builder.len()-1);
+        }
+
+        // execute the update statement
+        let patch_statement = connection.prepare(patch_builder);
+
+        if patch_statement.is_err() {
+            let error = patch_statement.err().unwrap();
+            return Err(error)
+        }
+        
+        let mut bound = patch_statement.unwrap().cursor();
+        let _res = bound.bind(bindings.as_slice());
+
+        return Ok(bound)
     }
 }

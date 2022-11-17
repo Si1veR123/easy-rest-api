@@ -22,7 +22,7 @@ type Config = HashMap<String, String>;
 
 #[async_trait::async_trait]
 pub trait DatabaseInterface {
-    // (connection, existing?)
+    // ( connection, existing? (or created) )
     fn connect(config: &Config) -> (Self, bool)
         where Self: Sized;
     fn delete_db(config: &Config)
@@ -138,7 +138,6 @@ impl DatabaseInterface for SQLite3Interface {
         }
 
         let response_json_text = Sqlite3ResponseBuilder::from_row_data(all_data);
-
         Response::new(Body::from(response_json_text))
     }
 }
